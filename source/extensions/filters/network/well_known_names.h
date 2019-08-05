@@ -22,6 +22,8 @@ public:
   const std::string HttpConnectionManager = "envoy.filters.network.http_connection_manager";
   // Local rate limit filter
   const std::string LocalRateLimit = "envoy.filters.network.local_ratelimit";
+  // Memcached proxy filter
+  const std::string MemcachedProxy = "envoy.filters.network.memcached_proxy";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.filters.network.mongo_proxy";
   // MySQL proxy filter
