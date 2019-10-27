@@ -185,11 +185,12 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <envoy_api_msg_api.v3alpha.Cluster>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
-  // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.StaticResources.clusters>`. This is
-  // unrelated to the :option:`--service-cluster` option which does not `affect zone aware routing
-  // <https://github.com/envoyproxy/envoy/issues/774>`_.
+  // <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.clusters>`. This is unrelated to
+  // the :ref:`Bootstrap node <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's
+  // :ref:`cluster <envoy_api_field_core.Node.cluster>` field. option which does not `affect zone
+  // aware routing <https://github.com/envoyproxy/envoy/issues/774>`_.
   string local_cluster_name = 1;
 
   // Optional global configuration for outlier detection.

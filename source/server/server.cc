@@ -420,6 +420,10 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+
+  // here we increment metrics for use of deprecated flags
+  const uint32_t num_deprecated_flags = options.deprecatedFlagsCount();
+
 }
 
 void InstanceImpl::startWorkers() {

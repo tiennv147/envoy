@@ -218,8 +218,17 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();
+  if (!service_cluster_.empty()) {
+    warnDeprecation("service-cluster");
+  }
   service_node_ = service_node.getValue();
+  if (!service_node_.empty()) {
+    warnDeprecation("service-node");
+  }
   service_zone_ = service_zone.getValue();
+  if (!service_zone_.empty()) {
+    warnDeprecation("service-zone");
+  }
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
@@ -265,6 +274,20 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 uint32_t OptionsImpl::count() const { return count_; }
 
 void OptionsImpl::logError(const std::string& error) const { throw MalformedArgvException(error); }
+
+void OptionsImpl::warnDeprecation(const std::string& flag) {
+  static constexpr char runtime_key[] = "envoy.deprecated_features.locality_cli_flags";
+  const auto warning = fmt::format("Using deprecated command line argument --{}. This configuration will "
+      "be removed from Envoy soon. Please see "
+      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
+      "`{}}` runtime key can be used to temporarily "
+      "enable this feature once the deprecation becomes fail by default.", flag, runtime_key);
+
+  // There's no runtime this early in the program, so no point in providing a runtime override.
+  // However, we still want the server to increment a metric for deprecated feature use.
+  deprecated_flags_count_ += 1;
+  ENVOY_LOG_MISC(warn, "{}", warning);
+}
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =

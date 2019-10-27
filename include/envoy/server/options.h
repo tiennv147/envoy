@@ -199,6 +199,11 @@ public:
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */
   virtual CommandLineOptionsPtr toCommandLineOptions() const PURE;
+
+  /**
+   * @return how many deprecated flags were used during start-up.
+   */
+  virtual uint32_t deprecatedFlagsCount() const PURE;
 };
 
 } // namespace Server

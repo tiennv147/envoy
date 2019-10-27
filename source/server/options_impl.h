@@ -135,9 +135,11 @@ public:
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
   uint32_t count() const;
+  uint32_t deprecatedFlagsCount() const override { return deprecated_flags_count_; }
 
 private:
   void logError(const std::string& error) const;
+  void warnDeprecation(const std::string& warning);
 
   uint64_t base_id_;
   uint32_t concurrency_;
@@ -168,6 +170,7 @@ private:
   bool cpuset_threads_;
   bool fake_symbol_table_enabled_;
   uint32_t count_;
+  uint32_t deprecated_flags_count_{0};
 };
 
 /**

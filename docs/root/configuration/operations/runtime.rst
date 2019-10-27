@@ -109,8 +109,8 @@ Cluster-specific subdirectories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap configuration,
-the *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
-that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will first look for the
+the *override_subdirectory* is used along with the :ref:`Bootstrap node <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`cluster <envoy_api_field_core.Node.cluster>` field. Assume
+that the cluster field has been set to ``my-cluster``. Envoy will first look for the
 *health_check.min_interval* key in the following full file system path:
 
 ``/srv/runtime/current/envoy_override/my-cluster/health_check/min_interval``
@@ -240,7 +240,7 @@ migrate to the new code path and make sure it is suitable for their use case.
 
 In the second phase the message and filename will be added to
 :repo:`runtime_features.cc <source/common/runtime/runtime_features.cc>`
-and use of that configuration field will cause the config to be rejected by default. 
+and use of that configuration field will cause the config to be rejected by default.
 This fail-by-default mode can be overridden in runtime configuration by setting
 envoy.deprecated_features.filename.proto:fieldname or envoy.deprecated_features.filename.proto:enum_value
 to true. For example, for a deprecated field

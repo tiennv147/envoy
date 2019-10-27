@@ -30,6 +30,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.trusted_forwarded_proto",
     "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
     "envoy.reloadable_features.connection_header_sanitization",
+    "envoy.reloadable_features.service_cluster_flag",
+    "envoy.reloadable_features.service_node_flag",
+    "envoy.reloadable_features.service_zone_flag",
 };
 
 // This is a list of configuration fields which are disallowed by default in Envoy

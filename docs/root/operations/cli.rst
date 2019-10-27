@@ -71,9 +71,9 @@ following are the command line options that Envoy supports.
 
 .. option:: --component-log-level <string>
 
-  *(optional)* The comma separated list of logging level per component. Non developers should generally 
-  never set this option. For example, if you want `upstream` component to run at `debug` level and 
-  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
+  *(optional)* The comma separated list of logging level per component. Non developers should generally
+  never set this option. For example, if you want `upstream` component to run at `debug` level and
+  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --cpuset-threads
@@ -152,7 +152,7 @@ following are the command line options that Envoy supports.
   matched against the output of the :http:get:`/hot_restart_version` admin endpoint to determine
   whether the new binary and the running binary are hot restart compatible.
 
-.. option:: --service-cluster <string>
+.. option:: --service-cluster <string> (deprecated)
 
   *(optional)* Defines the local service cluster name where Envoy is running. The
   local service cluster name is first sourced from the :ref:`Bootstrap node
@@ -170,7 +170,7 @@ following are the command line options that Envoy supports.
   <arch_overview_tracing>`, either via this CLI option or in the bootstrap
   configuration.
 
-.. option:: --service-node <string>
+.. option:: --service-node <string> (deprecated)
 
   *(optional)* Defines the local service node name where Envoy is running. The
   local service node name is first sourced from the :ref:`Bootstrap node
@@ -183,7 +183,7 @@ following are the command line options that Envoy supports.
   <arch_overview_tracing>`, either via this CLI option or in the bootstrap
   configuration.
 
-.. option:: --service-zone <string>
+.. option:: --service-zone <string> (deprecated)
 
   *(optional)* Defines the local service zone where Envoy is running. The local
   service zone is first sourced from the :ref:`Bootstrap node
@@ -211,11 +211,11 @@ following are the command line options that Envoy supports.
 
 .. option:: --drain-time-s <integer>
 
-  *(optional)* The time in seconds that Envoy will drain connections during 
+  *(optional)* The time in seconds that Envoy will drain connections during
   a :ref:`hot restart <arch_overview_hot_restart>` or when individual listeners are being
-  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`. 
-  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than 
-  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
+  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`.
+  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than
+  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two
   settings are configured depends on the specific deployment. In edge scenarios, it might be
   desirable to have a very long drain time. In service to service scenarios, it might be possible
   to make the drain and shutdown ime much shorter (e.g., 60s/90s).

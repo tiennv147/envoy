@@ -17,7 +17,7 @@ user-agent
 The *user-agent* header may be set by the connection manager during decoding if the :ref:`add_user_agent
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>` option is
 enabled. The header is only modified if it is not already set. If the connection manager does set the header, the value
-is determined by the :option:`--service-cluster` command line option.
+is determined by the :ref:`Bootstrap node <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`cluster <envoy_api_field_core.Node.cluster>` field.
 
 .. _config_http_conn_man_headers_server:
 
@@ -48,7 +48,7 @@ external requests, but for internal requests will contain the service cluster of
 that in the current implementation, this should be considered a hint as it is set by the caller and
 could be easily spoofed by any internal entity. In the future Envoy will support a mutual
 authentication TLS mesh which will make this header fully secure. Like *user-agent*, the value
-is determined by the :option:`--service-cluster` command line option. In order to enable this
+is determined by the :ref:`Bootstrap node <envoy_api_field_config.bootstrap.v2.Bootstrap.cluster>` message's :ref:`cluster <envoy_api_field_core.Node.cluster>` field. In order to enable this
 feature you need to set the :ref:`user_agent <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>` option to true.
 
 .. _config_http_conn_man_headers_downstream-service-node:
@@ -58,7 +58,7 @@ x-envoy-downstream-service-node
 
 Internal services may want to know the downstream node request comes from. This header
 is quite similar to :ref:`config_http_conn_man_headers_downstream-service-cluster`, except the value is taken from
-the  :option:`--service-node` option.
+the :ref:`Bootstrap node <envoy_api_field_config.bootstrap.v2.Bootstrap.node>` message's :ref:`cluster <envoy_api_field_core.Node.id>` field.
 
 .. _config_http_conn_man_headers_x-envoy-external-address:
 
