@@ -36,6 +36,11 @@ RouteEntryImplBase::RouteEntryImplBase(
     }
   }
 
+  shadow_policies_.reserve(route.shadow_policies().size());
+  for (const auto& shadow_policy : route.shadow_policies()) {
+    shadow_policies_.emplace_back(shadow_policy);
+  }
+
   if (route.route().cluster_specifier_case() ==
       envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
 
@@ -384,6 +389,16 @@ void Router::convertMessageBegin(MessageMetadataSharedPtr metadata) {
 }
 
 void Router::cleanup() { upstream_request_.reset(); }
+
+void Router::maybeDoShadowing() {
+  if (!do_shadowing_) {
+    return;
+  }
+
+  for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+    // config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(...), ...);
+  }
+}
 
 Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                                          MessageMetadataSharedPtr& metadata,

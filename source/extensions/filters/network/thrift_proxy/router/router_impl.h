@@ -41,6 +41,7 @@ public:
     return metadata_match_criteria_.get();
   }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  const std::vector<ShadowPolicy>& shadowPolicies() const override { return shadow_policies_; }
   bool stripServiceName() const override { return strip_service_name_; };
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
 
@@ -116,6 +117,7 @@ private:
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  std::vector<ShadowPolicyImpl> shadow_policies_;
   const bool strip_service_name_;
   const Http::LowerCaseString cluster_header_;
 };
@@ -258,6 +260,7 @@ private:
                                                POOL_GAUGE_PREFIX(scope, prefix),
                                                POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
+  void maybeDoShadowing();
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
