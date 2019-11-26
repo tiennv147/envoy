@@ -225,7 +225,7 @@ public:
    * @return std::string the identifying name for a particular implementation of a listener filter
    * produced by the factory.
    */
-  virtual std::string name() PURE;
+  virtual std::string name() const PURE;
 };
 
 /**
