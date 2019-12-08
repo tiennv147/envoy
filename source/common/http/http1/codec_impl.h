@@ -1,7 +1,5 @@
 #pragma once
 
-#include <http_parser.h>
-
 #include <array>
 #include <cstdint>
 #include <list>
@@ -9,6 +7,7 @@
 #include <string>
 
 #include "envoy/http/codec.h"
+#include "envoy/http/http1/parser.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
@@ -19,6 +18,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/http1/parser_factory.h"
 
 namespace Envoy {
 namespace Http {
@@ -192,8 +192,39 @@ public:
 
   CodecStats& stats() { return stats_; }
 
+  /**
+   * Common functionality for parsing a header field.
+   */
+  void onHeaderFieldBase(const char* data, size_t length);
+
+  /**
+   * Common functionality for parsing a header value.
+   */
+  void onHeaderValueBase(const char* data, size_t length);
+
+  /**
+   * Called when headers are complete. A base routine happens first then a virtual dispatch is
+   * invoked.
+   * @return 0 if no error, 1 if there should be no body.
+   */
+  void onHeadersCompleteBase();
+
+  /**
+   * Called when a request/response is beginning. A base routine happens first then a virtual
+   * dispatch is invoked.
+   */
+  void onMessageBeginBase();
+
+  /**
+   * Common functionality for when parsing an HTTP message is complete.
+   * @return 0 if not pausing, otherwise will return a library-specific non-zero code.
+   */
+  int onMessageCompleteBase();
+
 protected:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
+  enum class HeaderParsingState { Field, Value, Done };
+
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, MessageType type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter);
 
@@ -201,18 +232,19 @@ protected:
 
   Network::Connection& connection_;
   CodecStats stats_;
-  http_parser parser_;
+  std::unique_ptr<Parser> parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
+  HeaderMapImplPtr current_header_map_;
+  HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
+  bool seen_content_length_ : 1;
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
 
 private:
-  enum class HeaderParsingState { Field, Value, Done };
-
   /**
    * Called in order to complete an in progress header decode.
    */
@@ -224,55 +256,6 @@ private:
    * @len supplies the length of the span.
    */
   size_t dispatchSlice(const char* slice, size_t len);
-
-  /**
-   * Called when a request/response is beginning. A base routine happens first then a virtual
-   * dispatch is invoked.
-   */
-  void onMessageBeginBase();
-  virtual void onMessageBegin() PURE;
-
-  /**
-   * Called when URL data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   */
-  virtual void onUrl(const char* data, size_t length) PURE;
-
-  /**
-   * Called when header field data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   */
-  void onHeaderField(const char* data, size_t length);
-
-  /**
-   * Called when header value data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   */
-  void onHeaderValue(const char* data, size_t length);
-
-  /**
-   * Called when headers are complete. A base routine happens first then a virtual dispatch is
-   * invoked.
-   * @return 0 if no error, 1 if there should be no body.
-   */
-  int onHeadersCompleteBase();
-  virtual int onHeadersComplete(HeaderMapImplPtr&& headers) PURE;
-
-  /**
-   * Called when body data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   */
-  virtual void onBody(const char* data, size_t length) PURE;
-
-  /**
-   * Called when the request/response is complete.
-   */
-  void onMessageCompleteBase();
-  virtual void onMessageComplete() PURE;
 
   /**
    * @see onResetStreamBase().
@@ -296,11 +279,13 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
-  static http_parser_settings settings_;
+  /**
+   * Allows a hook for the parent class to call a child method.
+   */
+  virtual void processBody(const Buffer::RawSlice& body) PURE;
+
   static const ToLowerTable& toLowerTable();
 
-  HeaderMapImplPtr current_header_map_;
-  HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   Buffer::WatermarkBuffer output_buffer_;
@@ -314,13 +299,27 @@ private:
 /**
  * Implementation of Http::ServerConnection for HTTP/1.1.
  */
-class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
+class ServerConnectionImpl : public ServerConnection,
+                             public ConnectionImpl,
+                             public ParserCallbacks {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, Http1Settings settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
+
+  // ParserCallbacks
+  int onMessageBegin() override;
+  int onUrl(const char* data, size_t length) override;
+  int onStatus() override { return 0; }
+  int onHeaderField(const char* data, size_t length) override;
+  int onHeaderValue(const char* data, size_t length) override;
+  int onHeadersComplete() override;
+  int onBody(const char* data, size_t length) override;
+  int onMessageComplete() override;
+  int onChunkHeader() override { return 0; }
+  int onChunkComplete() override { return 0; }
 
 private:
   /**
@@ -349,15 +348,11 @@ private:
   // ConnectionImpl
   void onEncodeComplete() override;
   void onEncodeHeaders(const HeaderMap&) override {}
-  void onMessageBegin() override;
-  void onUrl(const char* data, size_t length) override;
-  int onHeadersComplete(HeaderMapImplPtr&& headers) override;
-  void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
+  void processBody(const Buffer::RawSlice& body) override;
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
@@ -367,7 +362,9 @@ private:
 /**
  * Implementation of Http::ClientConnection for HTTP/1.1.
  */
-class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
+class ClientConnectionImpl : public ClientConnection,
+                             public ConnectionImpl,
+                             public ParserCallbacks {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
@@ -375,6 +372,18 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+
+  // ParserCallbacks
+  int onMessageBegin() override;
+  int onUrl(const char*, size_t) override { return 0; }
+  int onStatus() override { return 0; }
+  int onHeaderField(const char* data, size_t length) override;
+  int onHeaderValue(const char* data, size_t length) override;
+  int onHeadersComplete() override;
+  int onBody(const char* data, size_t length) override;
+  int onMessageComplete() override;
+  int onChunkHeader() override { return 0; }
+  int onChunkComplete() override { return 0; }
 
 private:
   struct PendingResponse {
@@ -389,15 +398,11 @@ private:
   // ConnectionImpl
   void onEncodeComplete() override {}
   void onEncodeHeaders(const HeaderMap& headers) override;
-  void onMessageBegin() override {}
-  void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  int onHeadersComplete(HeaderMapImplPtr&& headers) override;
-  void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
+  void processBody(const Buffer::RawSlice& body) override;
 
   std::unique_ptr<RequestStreamEncoderImpl> request_encoder_;
   std::list<PendingResponse> pending_responses_;

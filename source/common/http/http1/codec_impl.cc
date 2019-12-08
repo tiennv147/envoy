@@ -65,6 +65,7 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 }
+
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
 }
@@ -314,46 +315,13 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
-http_parser_settings ConnectionImpl::settings_{
-    [](http_parser* parser) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onMessageBeginBase();
-      return 0;
-    },
-    [](http_parser* parser, const char* at, size_t length) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onUrl(at, length);
-      return 0;
-    },
-    nullptr, // on_status
-    [](http_parser* parser, const char* at, size_t length) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onHeaderField(at, length);
-      return 0;
-    },
-    [](http_parser* parser, const char* at, size_t length) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onHeaderValue(at, length);
-      return 0;
-    },
-    [](http_parser* parser) -> int {
-      return static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
-    },
-    [](http_parser* parser, const char* at, size_t length) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onBody(at, length);
-      return 0;
-    },
-    [](http_parser* parser) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
-      return 0;
-    },
-    nullptr, // on_chunk_header
-    nullptr  // on_chunk_complete
-};
-
 const ToLowerTable& ConnectionImpl::toLowerTable() {
   static auto* table = new ToLowerTable();
   return *table;
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               http_parser_type type, uint32_t max_headers_kb,
+                               MessageType, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
@@ -366,8 +334,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
-  http_parser_init(&parser_, type);
-  parser_.data = this;
 }
 
 void ConnectionImpl::completeLastHeader() {
@@ -402,7 +368,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     total_parsed += slice.len_;
-    onBody(static_cast<const char*>(slice.mem_), slice.len_);
+    processBody(slice);
   }
   ENVOY_CONN_LOG(trace, "direct-dispatched {} bytes", connection_, total_parsed);
   data.drain(total_parsed);
@@ -417,7 +383,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   }
 
   // Always unpause before dispatch.
-  http_parser_pause(&parser_, 0);
+  parser_->resume();
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
@@ -440,17 +406,18 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
-  ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
-  if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+  ASSERT(parser_ != nullptr);
+  const size_t bytes_read = parser_->execute(slice, len);
+  if (parser_->getErrno() != static_cast<int>(ParserStatus::Ok) &&
+      parser_->getErrno() != static_cast<int>(ParserStatus::Paused)) {
     sendProtocolError();
-    throw CodecProtocolException("http/1.1 protocol error: " +
-                                 std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
+    throw CodecProtocolException(absl::StrCat("http/1.1 protocol error: ", parser_->errnoName()));
   }
 
-  return rc;
+  return bytes_read;
 }
 
-void ConnectionImpl::onHeaderField(const char* data, size_t length) {
+void ConnectionImpl::onHeaderFieldBase(const char* data, size_t length) {
   if (header_parsing_state_ == HeaderParsingState::Done) {
     // Ignore trailers.
     return;
@@ -463,14 +430,13 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
   current_header_field_.append(data, length);
 }
 
-void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
+void ConnectionImpl::onHeaderValueBase(const char* data, size_t length) {
   if (header_parsing_state_ == HeaderParsingState::Done) {
     // Ignore trailers.
     return;
   }
 
   const absl::string_view header_value = absl::string_view(data, length);
-
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
@@ -499,10 +465,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 }
 
-int ConnectionImpl::onHeadersCompleteBase() {
+void ConnectionImpl::onHeadersCompleteBase() {
   ENVOY_CONN_LOG(trace, "headers complete", connection_);
   completeLastHeader();
-  if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
+  if (!(parser_->httpMajor() == 1 && parser_->httpMinor() == 1)) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
@@ -541,25 +507,20 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
 
-  int rc = onHeadersComplete(std::move(current_header_map_));
-  current_header_map_.reset();
-  header_parsing_state_ = HeaderParsingState::Done;
-
-  // Returning 2 informs http_parser to not expect a body or further data on this connection.
-  return handling_upgrade_ ? 2 : rc;
+  seen_content_length_ = current_header_map_->ContentLength() != nullptr;
 }
 
-void ConnectionImpl::onMessageCompleteBase() {
+int ConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (handling_upgrade_) {
     // If this is an upgrade request, swallow the onMessageComplete. The
     // upgrade payload will be treated as stream body.
     ASSERT(!deferred_end_stream_headers_);
     ENVOY_CONN_LOG(trace, "Pausing parser due to upgrade.", connection_);
-    http_parser_pause(&parser_, 1);
-    return;
+    return parser_->pause();
   }
-  onMessageComplete();
+
+  return 0;
 }
 
 void ConnectionImpl::onMessageBeginBase() {
@@ -571,7 +532,6 @@ void ConnectionImpl::onMessageBeginBase() {
   ASSERT(!current_header_map_);
   current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
-  onMessageBegin();
 }
 
 void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
@@ -584,9 +544,11 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb,
                                            const uint32_t max_request_headers_count)
-    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
+    : ConnectionImpl(connection, stats, MessageType::Request, max_request_headers_kb,
                      max_request_headers_count, formatter(settings)),
-      callbacks_(callbacks), codec_settings_(settings) {}
+      callbacks_(callbacks), codec_settings_(settings) {
+  parser_ = ParserFactory::create(MessageType::Request, this);
+}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -601,12 +563,12 @@ void ServerConnectionImpl::onEncodeComplete() {
 void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int method) {
   HeaderString path(Headers::get().Path);
 
-  bool is_connect = (method == HTTP_CONNECT);
+  bool is_connect = (method == static_cast<int>(Method::Connect));
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
   if (!active_request_->request_url_.getStringView().empty() &&
       (active_request_->request_url_.getStringView()[0] == '/' ||
-       ((method == HTTP_OPTIONS) && active_request_->request_url_.getStringView()[0] == '*'))) {
+       ((method == static_cast<int>(Method::Options)) && active_request_->request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
@@ -641,23 +603,27 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   active_request_->request_url_.clear();
 }
 
-int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
+int ServerConnectionImpl::onHeadersComplete() {
+  onHeadersCompleteBase();
+
+  int rc = 0;
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+    const char* method_string = parser_->methodName();
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
-    active_request_->response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
+    active_request_->response_encoder_.isResponseToHeadRequest(parser_->method() ==
+                                                               static_cast<int>(Method::Head));
 
     // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
     // CONNECT
-    handlePath(*headers, parser_.method);
+    handlePath(*current_header_map_, parser_->method());
     ASSERT(active_request_->request_url_.empty());
 
-    headers->setMethod(method_string);
+    current_header_map_->setMethod(method_string);
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
     // presence of content-length or chunked transfer-encoding indicates a body vs. a particular
@@ -665,48 +631,77 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     // with message complete. This allows upper layers to behave like HTTP/2 and prevents a proxy
     // scenario where the higher layers stream through and implicitly switch to chunked transfer
     // encoding because end stream with zero body length has not yet been indicated.
-    if (parser_.flags & F_CHUNKED ||
-        (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX) || handling_upgrade_) {
-      active_request_->request_decoder_->decodeHeaders(std::move(headers), false);
+    if (parser_->flags() & static_cast<int>(Flags::Chunked) ||
+        (parser_->contentLength() > 0 && parser_->contentLength() != ULLONG_MAX) || handling_upgrade_) {
+      active_request_->request_decoder_->decodeHeaders(std::move(current_header_map_), false);
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
       if (connection_.state() != Network::Connection::State::Open) {
-        http_parser_pause(&parser_, 1);
+        rc = parser_->pause();
       }
 
     } else {
-      deferred_end_stream_headers_ = std::move(headers);
+      deferred_end_stream_headers_ = std::move(current_header_map_);
     }
   }
 
-  return 0;
+  current_header_map_.reset();
+  header_parsing_state_ = HeaderParsingState::Done;
+
+  // Returning 2 informs the parser to not expect a body or further data on this connection.
+  return handling_upgrade_ ? 2 : rc;
 }
 
-void ServerConnectionImpl::onMessageBegin() {
+int ServerConnectionImpl::onMessageBegin() {
+  onMessageBeginBase();
+
   if (!resetStreamCalled()) {
     ASSERT(!active_request_);
     active_request_ = std::make_unique<ActiveRequest>(*this, header_key_formatter_.get());
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
   }
+
+  return 0;
 }
 
-void ServerConnectionImpl::onUrl(const char* data, size_t length) {
+int ServerConnectionImpl::onUrl(const char* data, size_t length) {
   if (active_request_) {
     active_request_->request_url_.append(data, length);
   }
+
+  return 0;
 }
 
-void ServerConnectionImpl::onBody(const char* data, size_t length) {
+int ClientConnectionImpl::onMessageBegin() {
+  onMessageBeginBase();
+  return 0;
+}
+
+int ServerConnectionImpl::onHeaderField(const char* data, size_t length) {
+  onHeaderFieldBase(data, length);
+  return 0;
+}
+
+int ServerConnectionImpl::onHeaderValue(const char* data, size_t length) {
+  onHeaderValueBase(data, length);
+  return 0;
+}
+
+int ServerConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_) {
     ENVOY_CONN_LOG(trace, "body size={}", connection_, length);
     Buffer::OwnedImpl buffer(data, length);
     active_request_->request_decoder_->decodeData(buffer, false);
   }
+
+  return 0;
 }
 
-void ServerConnectionImpl::onMessageComplete() {
+int ServerConnectionImpl::onMessageComplete() {
+  onMessageCompleteBase();
+
   if (active_request_) {
     Buffer::OwnedImpl buffer;
     active_request_->remote_complete_ = true;
@@ -723,7 +718,7 @@ void ServerConnectionImpl::onMessageComplete() {
   // Always pause the parser so that the calling code can process 1 request at a time and apply
   // back pressure. However this means that the calling code needs to detect if there is more data
   // in the buffer and dispatch it again.
-  http_parser_pause(&parser_, 1);
+  return parser_->pause();
 }
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
@@ -757,16 +752,22 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
+void ServerConnectionImpl::processBody(const Buffer::RawSlice& slice) {
+  onBody(static_cast<const char*>(slice.mem_), slice.len_);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
-    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings)) {}
+    : ConnectionImpl(connection, stats, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
+                     max_response_headers_count, formatter(settings)) {
+  parser_ = ParserFactory::create(MessageType::Response, this);
+}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
-      parser_.status_code == 204 || parser_.status_code == 304 ||
-      (parser_.status_code >= 200 && parser_.content_length == 0)) {
+      parser_->statusCode() == 204 || parser_->statusCode() == 304 ||
+      (parser_->statusCode() >= 200 && (seen_content_length_ && parser_->contentLength() == 0))) {
     return true;
   } else {
     return false;
@@ -793,46 +794,67 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
   }
 }
 
-int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  headers->setStatus(parser_.status_code);
+int ClientConnectionImpl::onHeadersComplete() {
+  onHeadersCompleteBase();
+  current_header_map_->setStatus(parser_->statusCode());
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
   if (pending_responses_.empty() && !resetStreamCalled()) {
-    throw PrematureResponseException(std::move(headers));
+    throw PrematureResponseException(std::move(current_header_map_));
   } else if (!pending_responses_.empty()) {
-    if (parser_.status_code == 100) {
+    if (parser_->statusCode() == 100) {
       // http-parser treats 100 continue headers as their own complete response.
       // Swallow the spurious onMessageComplete and continue processing.
       ignore_message_complete_for_100_continue_ = true;
-      pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(headers));
+      pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(current_header_map_));
     } else if (cannotHaveBody()) {
-      deferred_end_stream_headers_ = std::move(headers);
+      deferred_end_stream_headers_ = std::move(current_header_map_);
     } else {
-      pending_responses_.front().decoder_->decodeHeaders(std::move(headers), false);
+      pending_responses_.front().decoder_->decodeHeaders(std::move(current_header_map_), false);
     }
   }
 
   // Here we deal with cases where the response cannot have a body, but http_parser does not deal
   // with it for us.
-  return cannotHaveBody() ? 1 : 0;
+  const int rc = cannotHaveBody() ? 1 : 0;
+
+  current_header_map_.reset();
+  header_parsing_state_ = HeaderParsingState::Done;
+
+  // Returning 2 informs the parser to not expect a body or further data on this connection.
+  return handling_upgrade_ ? 2 : rc;
 }
 
-void ClientConnectionImpl::onBody(const char* data, size_t length) {
+int ClientConnectionImpl::onHeaderField(const char* data, size_t length) {
+  onHeaderFieldBase(data, length);
+  return 0;
+}
+
+int ClientConnectionImpl::onHeaderValue(const char* data, size_t length) {
+  onHeaderValueBase(data, length);
+  return 0;
+}
+
+int ClientConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (!pending_responses_.empty()) {
     Buffer::OwnedImpl buffer;
     buffer.add(data, length);
     pending_responses_.front().decoder_->decodeData(buffer, false);
   }
+
+  return 0;
 }
 
-void ClientConnectionImpl::onMessageComplete() {
+int ClientConnectionImpl::onMessageComplete() {
+  onMessageCompleteBase();
+
   ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
-    return;
+    return 0;
   }
   if (!pending_responses_.empty()) {
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
@@ -859,6 +881,8 @@ void ClientConnectionImpl::onMessageComplete() {
       response.decoder_->decodeData(buffer, true);
     }
   }
+
+  return 0;
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
@@ -882,6 +906,10 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   if (!pending_responses_.empty()) {
     request_encoder_->runLowWatermarkCallbacks();
   }
+}
+
+void ClientConnectionImpl::processBody(const Buffer::RawSlice& slice) {
+  onBody(static_cast<const char*>(slice.mem_), slice.len_);
 }
 
 } // namespace Http1

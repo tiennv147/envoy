@@ -18,11 +18,12 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = ["http_parser"],
     deps = [
+        ":parser_factory_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http/http1:parser_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
@@ -69,5 +70,28 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "legacy_http_parser_lib",
+    srcs = ["legacy_http_parser.cc"],
+    hdrs = ["legacy_http_parser.h"],
+    external_deps = [
+        "http_parser",
+    ],
+    deps = [
+        "//include/envoy/http/http1:parser_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "parser_factory_lib",
+    srcs = ["parser_factory.cc"],
+    hdrs = ["parser_factory.h"],
+    deps = [
+        ":legacy_http_parser_lib",
+        "//include/envoy/http/http1:parser_interface",
     ],
 )
