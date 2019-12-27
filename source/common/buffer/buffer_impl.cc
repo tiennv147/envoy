@@ -113,14 +113,14 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
     if (size == 0) {
       break;
     }
-    uint64_t data_size = slice->dataSize();
+    const uint64_t data_size = slice->dataSize();
     if (data_size <= bytes_to_skip) {
       // The offset where the caller wants to start copying is after the end of this slice,
       // so just skip over this slice completely.
       bytes_to_skip -= data_size;
       continue;
     }
-    uint64_t copy_size = std::min(size, data_size - bytes_to_skip);
+    const uint64_t copy_size = std::min(size, data_size - bytes_to_skip);
     memcpy(dest, slice->data() + bytes_to_skip, copy_size);
     size -= copy_size;
     dest += copy_size;
@@ -137,7 +137,7 @@ void OwnedImpl::drain(uint64_t size) {
     if (slices_.empty()) {
       break;
     }
-    uint64_t slice_size = slices_.front()->dataSize();
+    const uint64_t slice_size = slices_.front()->dataSize();
     if (slice_size <= size) {
       slices_.pop_front();
       length_ -= slice_size;
@@ -205,7 +205,7 @@ void* OwnedImpl::linearize(uint32_t size) {
     ASSERT(reservation.len_ == linearized_size);
     auto dest = static_cast<uint8_t*>(reservation.mem_);
     do {
-      uint64_t data_size = slices_.front()->dataSize();
+      const uint64_t data_size = slices_.front()->dataSize();
       memcpy(dest, slices_.front()->data(), data_size);
       bytes_copied += data_size;
       dest += data_size;

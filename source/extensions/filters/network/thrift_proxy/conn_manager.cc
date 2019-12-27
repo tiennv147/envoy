@@ -436,7 +436,7 @@ FilterStatus ConnectionManager::ActiveRpc::fieldBegin(absl::string_view name, Fi
         absl::any_cast<std::tuple<std::string, FieldType, int16_t>&>(filter_context_);
     std::string& name = std::get<0>(t);
     FieldType& field_type = std::get<1>(t);
-    int16_t& field_id = std::get<2>(t);
+    const int16_t& field_id = std::get<2>(t);
     return filter->fieldBegin(name, field_type, field_id);
   };
 
@@ -451,7 +451,7 @@ FilterStatus ConnectionManager::ActiveRpc::fieldEnd() {
 FilterStatus ConnectionManager::ActiveRpc::boolValue(bool& value) {
   filter_context_ = value;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
-    bool& value = absl::any_cast<bool&>(filter_context_);
+    const bool& value = absl::any_cast<bool&>(filter_context_);
     return filter->boolValue(value);
   };
 
