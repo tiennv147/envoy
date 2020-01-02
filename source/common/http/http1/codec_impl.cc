@@ -612,7 +612,6 @@ int ConnectionImpl::onMessageCompleteBase() {
     completeLastHeader();
   }
 
-  onMessageComplete(std::move(current_header_map_));
   return 0;
 }
 
@@ -697,8 +696,8 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   active_request_->request_url_.clear();
 }
 
-int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
+int ServerConnectionImpl::onHeadersComplete() {
+  ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, current_header_map_->size());
   onHeadersCompleteBase();
 
   int rc = 0;
@@ -794,8 +793,11 @@ int ServerConnectionImpl::onBody(const char* data, size_t length) {
   return 0;
 }
 
-int ServerConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
-  onMessageCompleteBase();
+int ServerConnectionImpl::onMessageComplete() {
+  const int rc = onMessageCompleteBase();
+  if (rc != 0) {
+    return rc;
+  }
 
   if (active_request_) {
     active_request_->remote_complete_ = true;
@@ -804,7 +806,7 @@ int ServerConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
                                                        true);
       deferred_end_stream_headers_.reset();
     } else if (processing_trailers_) {
-      active_request_->request_decoder_->decodeTrailers(std::move(trailers));
+      active_request_->request_decoder_->decodeTrailers(std::move(current_header_map_));
     } else {
       Buffer::OwnedImpl buffer;
       active_request_->request_decoder_->decodeData(buffer, true);
@@ -893,10 +895,10 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
   }
 }
 
-int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
+int ClientConnectionImpl::onHeadersComplete() {
+  ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, current_header_map_->size());
   onHeadersCompleteBase();
-  headers->setStatus(parser_->statusCode());
+  current_header_map_->setStatus(parser_->statusCode());
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
@@ -948,8 +950,12 @@ int ClientConnectionImpl::onBody(const char* data, size_t length) {
   return 0;
 }
 
-int ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
-  onMessageCompleteBase();
+int ClientConnectionImpl::onMessageComplete() {
+  const int rc = onMessageCompleteBase();
+  if (rc != 0) {
+    return rc;
+  }
+
   ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
@@ -976,7 +982,7 @@ int ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
       response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);
       deferred_end_stream_headers_.reset();
     } else if (processing_trailers_) {
-      response.decoder_->decodeTrailers(std::move(trailers));
+      response.decoder_->decodeTrailers(std::move(current_header_map_));
     } else {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
