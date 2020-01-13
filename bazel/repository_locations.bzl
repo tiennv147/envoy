@@ -63,10 +63,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/c-ares/c-ares/archive/d7e070e7283f822b1d2787903cce3615536c5610.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        sha256 = "8165aa25e529d7d4b9ae849d3bf30371255a99d6db0421516abcff23214cdc2c",
-        strip_prefix = "libcircllhist-63a16dd6f2fc7bc841bb17ff92be8318df60e2e1",
-        # 2019-02-11
-        urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
+        sha256 = "4d885ca1662df5ea55a1bcece812fd6794ad923b0d2d3ed7c3331d7e5a772006",
+        strip_prefix = "libcircllhist-d56f43f5dd1b059868feacdfedf4e0dd1b83818a",
+        # 2020-01-12
+        urls = ["https://github.com/circonus-labs/libcircllhist/archive/d56f43f5dd1b059868feacdfedf4e0dd1b83818a.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "7e93d28e81c3e95ff07674a400001d0cdf23b7842d49b211e5582d00d8e3ac3e",
@@ -80,19 +80,19 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/envoyproxy/sql-parser/archive/85904962d8723bbd3ae280dfb13cf4cc563faabc.tar.gz"],
     ),
     com_github_mirror_tclap = dict(
-        sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
-        strip_prefix = "tclap-tclap-1-2-1-release-final",
-        urls = ["https://github.com/mirror/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
+        sha256 = "4c8529f2154a6c0e1cf518a1c2284ad33e4e1021e8e03f2773b573fe1c73910f",
+        strip_prefix = "tclap-1.2.2",
+        urls = ["https://github.com/mirror/tclap/archive/v1.2.2.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "4c0741e10183f75d7d6f730b8708a99b329b2f942dad5a9da3385ab92bb4a15c",
-        strip_prefix = "fmt-5.3.0",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip"],
+        sha256 = "63650f3c39a96371f5810c4e41d6f9b0bb10305064e6faf201cbafe297ea30e8",
+        strip_prefix = "fmt-6.1.2",
+        urls = ["https://github.com/fmtlib/fmt/releases/download/6.1.2/fmt-6.1.2.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "160845266e94db1d4922ef755637f6901266731c4cb3b30b45bf41efa0e6ab70",
-        strip_prefix = "spdlog-1.3.1",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
+        sha256 = "821c85b120ad15d87ca2bc44185fa9091409777c756029125a02f81354072157",
+        strip_prefix = "spdlog-1.4.2",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.4.2.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
         sha256 = "54597f640c0ab5e5d783d2f3d3cfe8ad6da999ef1a194d89c2c5ab89a1fd8e13",
@@ -124,19 +124,19 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.40.0/nghttp2-1.40.0.tar.gz"],
     ),
     io_opentracing_cpp = dict(
-        sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
-        strip_prefix = "opentracing-cpp-1.5.1",
-        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
+        sha256 = "5b170042da4d1c4c231df6594da120875429d5231e9baa5179822ee8d1054ac3",
+        strip_prefix = "opentracing-cpp-1.6.0",
+        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.6.0.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
-        sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
-        strip_prefix = "lightstep-tracer-cpp-0.8.0",
-        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
+        sha256 = "e7c367fa59cb982352ab33e74bb194484590a793e71f92cf6ce2741757103ff0",
+        strip_prefix = "lightstep-tracer-cpp-0.9.0",
+        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.9.0.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "052fd37cd698e24ab73ee18fc3fa55acd1d43153c12a0e65b0fba0447de1117e",
-        strip_prefix = "dd-opentracing-cpp-1.1.1",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.1.tar.gz"],
+        sha256 = "4d5297006eee88ab58f06294226ea5d7f552d4dce4582cb65b7c12e95381458b",
+        strip_prefix = "dd-opentracing-cpp-1.1.2",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.2.tar.gz"],
     ),
     com_github_google_benchmark = dict(
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
@@ -259,9 +259,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "52af3361cf806330b88b4fe6f483b6844209d47ae196ac46da4de59bb361ab02",
-        strip_prefix = "curl-7.67.0",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_67_0/curl-7.67.0.tar.gz"],
+        sha256 = "1dd7604e418b0b9a9077f62f763f6684c1b092a7bc17e3f354b8ad5c964d7358",
+        strip_prefix = "curl-7.68.0",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_68_0/curl-7.68.0.tar.gz"],
     ),
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
