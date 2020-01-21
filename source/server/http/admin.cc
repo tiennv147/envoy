@@ -929,6 +929,9 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   envoy::admin::v3::CommandLineOptions* command_line_options =
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();
+  server_info.set_cluster_name(server_.localInfo().clusterName());
+  server_info.set_node_name(server_.localInfo().nodeName());
+  server_info.set_zone_name(server_.localInfo().zoneName());
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;

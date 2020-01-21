@@ -1484,6 +1484,9 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+    EXPECT_EQ(server_info_proto.cluster_name(), "cluster");
+    EXPECT_EQ(server_info_proto.node_name(), "");
+    EXPECT_EQ(server_info_proto.zone_name(), "");
   }
 
   {
@@ -1502,6 +1505,28 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::PRE_INITIALIZING);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+    EXPECT_EQ(server_info_proto.cluster_name(), "cluster");
+  }
+
+  {
+    {
+      // Verify that cluster_name, node_name, and zone_name are correctly propagated.
+      Http::HeaderMapImpl response_headers;
+      std::string body;
+
+      ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
+      ON_CALL(server_.local_info_, nodeName()).WillByDefault(ReturnRef("node"));
+      ON_CALL(server_.local_info_, clusterName()).WillByDefault(ReturnRef("cluster"));
+      ON_CALL(server_.local_info_, zoneName()).WillByDefault(ReturnRef("zone"));
+      EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+
+      envoy::admin::v3::ServerInfo server_info_proto;
+      TestUtility::loadFromJson(body, server_info_proto);
+
+      EXPECT_EQ(server_info_proto.node_name(), "node_name");
+      EXPECT_EQ(server_info_proto.cluster_name(), "cluster_name");
+      EXPECT_EQ(server_info_proto.zone_name(), "zone_name");
+    }
   }
 
   Http::HeaderMapImpl response_headers;
@@ -1519,6 +1544,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::INITIALIZING);
   EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  EXPECT_EQ(server_info_proto.cluster_name(), "cluster");
 }
 
 TEST_P(AdminInstanceTest, GetReadyRequest) {

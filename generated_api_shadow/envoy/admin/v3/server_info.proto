@@ -16,7 +16,7 @@ option java_multiple_files = true;
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
-// [#next-free-field: 7]
+// [#next-free-field: 16]
 message ServerInfo {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ServerInfo";
 
@@ -51,6 +51,15 @@ message ServerInfo {
 
   // Command line options the server is currently running with.
   CommandLineOptions command_line_options = 6;
+
+  // Name of the cluster Envoy is running in.
+  string cluster_name = 13;
+
+  // The node identifier.
+  string node_name = 14;
+
+  // The locality zone.
+  string zone_name = 15;
 }
 
 // [#next-free-field: 29]
