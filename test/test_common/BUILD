@@ -102,6 +102,7 @@ envoy_cc_test_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
         "//source/common/api:api_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
