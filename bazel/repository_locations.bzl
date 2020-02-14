@@ -222,9 +222,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/release-1.10.0.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "d7cfd31620a352b2ee8c1ed883222a0d77e44346643458e062e86b1d069ace3e",
-        strip_prefix = "protobuf-3.10.1",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.10.1/protobuf-all-3.10.1.tar.gz"],
+        sha256 = "954536082306f50e3aa19ab70b356bd242d8408d7d8ca709e9c67a79a9020721",
+        strip_prefix = "protobuf-3.11.3",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.11.3/protobuf-all-3.11.3.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "a447458b47ea4dc1d31499f555769af437c5d129d988ec1e13d5fdd0a6a36b4e",
