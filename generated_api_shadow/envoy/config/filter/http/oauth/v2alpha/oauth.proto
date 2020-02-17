@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.oauth.v2alpha;
+
+import "udpa/annotations/migrate.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.oauth.v2alpha";
+option java_outer_classname = "OauthProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.oauth.v3";
+
+// [#protodoc-title: OAuth]
+// OAuth :ref:`configuration overview <config_http_filters_oauth>`.
+// [#extension: envoy.filters.http.oauth]
+
+// Top level configuration for the OAuth filter.
+// [#next-free-field: 9]
+message Filter {
+  string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  string client_secret = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  string idp_cluster_name = 3;
+
+  string idp_hostname = 4;
+
+  string auth_http_path = 5;
+
+  string token_http_path = 6;
+
+  // The full URL that is used to return from the IdP.
+  string callback_url = 7;
+
+  // List of scopes that the OAuth filter permits. If the scope
+  // does not match, the filter will return 403 Forbidden.
+  repeated string scopes = 8;
+}
+
+// [#next-free-field: 6]
+message AccessTokenIdpResponse {
+  string access_token = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  string token_type = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  string expires_in = 3;
+
+  string refresh_token = 4;
+
+  string scope = 5;
+}

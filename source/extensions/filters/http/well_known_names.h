@@ -38,6 +38,8 @@ public:
   const std::string EnvoyGzip = "envoy.filters.http.gzip";
   // IP tagging filter
   const std::string IpTagging = "envoy.filters.http.ip_tagging";
+  // OAuth filter
+  const std::string OAuth = "envoy.filters.http.oauth";
   // Rate limit filter
   const std::string RateLimit = "envoy.filters.http.ratelimit";
   // Router filter
