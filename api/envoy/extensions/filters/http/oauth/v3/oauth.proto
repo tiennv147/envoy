@@ -15,7 +15,7 @@ option java_multiple_files = true;
 // [#extension: envoy.filters.http.oauth]
 
 // Top level configuration for the OAuth filter.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Filter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.oauth.v2alpha.Filter";
@@ -38,6 +38,8 @@ message Filter {
   // List of scopes that the OAuth filter permits. If the scope
   // does not match, the filter will return 403 Forbidden.
   repeated string scopes = 8;
+
+  string signout_path = 9;
 }
 
 // [#next-free-field: 6]

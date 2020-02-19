@@ -13,8 +13,11 @@ namespace OAuth {
 class Factory : public Common::FactoryBase<envoy::extensions::filters::http::oauth::v3::Filter> {
 public:
   Factory();
+
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth::v3::Filter& proto_config, const std::string&, Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::oauth::v3::Filter& proto_config, const std::string&,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace OAuth
