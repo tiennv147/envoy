@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_cc_test_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -37,10 +38,21 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "http_client_test",
+    srcs = ["http_client_test.cc"],
+    extension_name = "envoy.filters.http.oauth",
+    deps = [
+        "//source/extensions/filters/http/oauth:http_client_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "mocks",
     hdrs = ["mocks.h"],
     deps = [
-        "source/extensions/filters/http/oauth:http_client_lib",
+        "//source/extensions/filters/http/oauth:http_client_lib",
     ]
 )

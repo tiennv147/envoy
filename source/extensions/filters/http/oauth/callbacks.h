@@ -3,7 +3,13 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace OAuth {} // namespace OAuth
+namespace OAuth {
+
+class FilterCallbacks {
+  
+};
+
+} // namespace OAuth
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

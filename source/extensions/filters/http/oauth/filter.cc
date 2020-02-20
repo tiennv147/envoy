@@ -1,5 +1,6 @@
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
 #include "envoy/server/filter_config.h"
@@ -31,7 +32,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::oauth::v3::Fi
 
 Filter::Filter(const std::shared_ptr<FilterConfig> filter_config) : config_(filter_config) {}
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto path = headers.Path()->value().getStringView();
   Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path);
   const auto no_query_param_path = path.substr(0, path.find('?'));
@@ -60,6 +61,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
     // send fetchAccessToken()
 
     // Return an HTTP 302 to the originally requested resource?
+    // And set a set-cookie to clear the state cookie?
   } else {
     // validate access token?
   }
@@ -68,14 +70,22 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
 }
 
 void Filter::enqueueSignoutRedirect() {
-  Http::HeaderMapPtr response_headers{Http::HeaderMapImpl::create({
+  Http::ResponseHeaderMapPtr response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>({
       {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
       // The location header can be relative or absolute. We choose relative here to avoid
       // needing to get the host.
       {Http::Headers::get().Location, "/"},
       {Http::Headers::get().SetCookie,
        "OauthAccessToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-  })};
+  });
+
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+}
+
+void Filter::enqueueForbiddenResponse() {
+  Http::ResponseHeaderMapPtr response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>({
+      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Forbidden))},
+  });
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 }

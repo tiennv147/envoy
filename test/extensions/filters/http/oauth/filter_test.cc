@@ -51,13 +51,13 @@ public:
 };
 
 TEST_F(FilterTest, SignOutPath) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
     {":method", "GET"},
     {":path", "/signout"},
     {":authority", "envoyproxy.io"},
   };
 
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestRequestHeaderMapImpl response_headers{
       {":status", "302"},
       {"location", "/"},
       {"set-cookie", "OauthAccessToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
@@ -68,13 +68,13 @@ TEST_F(FilterTest, SignOutPath) {
 }
 
 TEST_F(FilterTest, SignOutPathWithQueryParameters) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
     {":method", "GET"},
     {":path", "/signout?foo=bar&biz=baz"},
     {":authority", "envoyproxy.io"},
   };
 
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestRequestHeaderMapImpl response_headers{
       {":status", "302"},
       {"location", "/"},
       {"set-cookie", "OauthAccessToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},

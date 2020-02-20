@@ -35,7 +35,7 @@ public:
   explicit Filter(const std::shared_ptr<FilterConfig> filter_config);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
 
 private:
   std::shared_ptr<FilterConfig> config_; // can this just be a const ref?
@@ -44,6 +44,8 @@ private:
    * Creates a redirect response to "/" and sets it in the decoder_callbacks_.
    */
   void enqueueSignoutRedirect();
+
+  void enqueueForbiddenResponse();
 };
 
 } // namespace OAuth

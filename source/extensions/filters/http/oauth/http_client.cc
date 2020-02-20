@@ -19,6 +19,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OAuth {
 
+std::string UrlEncode(const std::string& input) {
+  return absl::StrReplaceAll(
+      input, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+}
+
 HttpClient::HttpClient(Upstream::ClusterManager& cm) : cm_(cm) {}
 
 void HttpClient::fetchAccessToken(const std::string& path, const std::string& host,
@@ -26,7 +31,7 @@ void HttpClient::fetchAccessToken(const std::string& path, const std::string& ho
                                   const std::string& scope, const std::string& state,
                                   const std::chrono::milliseconds& timeout,
                                   const std::string& cluster) {
-  Http::HeaderMapPtr headers = Http::HeaderMapImpl::create({
+  Http::RequestHeaderMapPtr headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Path, path},
       {Http::Headers::get().Accept, "application/json"},
@@ -35,21 +40,19 @@ void HttpClient::fetchAccessToken(const std::string& path, const std::string& ho
   });
 
   const std::string request_body =
-      absl::StrCat("response_type=code&client_id=", client_id, "&redirect_uri=", redirect_uri,
-                   "&scope=", scope, "&state=", state);
-  const std::string urlencoded_request_body = absl::StrReplaceAll(
-      request_body, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+      absl::StrCat("response_type=code&client_id=", UrlEncode(client_id), "&redirect_uri=", UrlEncode(redirect_uri),
+                   "&scope=", UrlEncode(scope), "&state=", UrlEncode(state));
 
   Buffer::InstancePtr body = std::make_unique<Buffer::OwnedImpl>();
-  body->add(urlencoded_request_body);
+  body->add(request_body);
 
-  Http::MessagePtr message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
   message->body() = std::move(body);
   in_flight_request_ = cm_.httpAsyncClientForCluster(cluster).send(
       std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
 
-void HttpClient::onSuccess(Http::MessagePtr&&) {
+void HttpClient::onSuccess(Http::ResponseMessagePtr&&) {
   // TODO
 }
 
